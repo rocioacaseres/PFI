@@ -3,10 +3,15 @@ import numpy as np
 import pandas as pd
 import librosa
 import kagglehub 
+import time
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import RidgeClassifierCV
 from sktime.transformations.panel.rocket import Rocket
 
+# ==========================================
+# 0. SETEO TIMER
+# ==========================================
+inicio_total = time.time()
 # ==========================================
 # 1. CARGA Y FILTRADO DEL DATASET (ESC-50)
 # ==========================================
@@ -108,6 +113,13 @@ classifier.fit(X_train_transform, y_train)
 # Evaluolos resultados. Comparo training data con testing data
 train_acc = classifier.score(X_train_transform, y_train)
 test_acc = classifier.score(X_test_transform, y_test)
+
+# ==========================================
+# FIN DEL TIEMPO TOTAL
+# ==========================================
+fin_total = time.time()
+tiempo_total_ejecucion = fin_total - inicio_total
+print("Tiempo total {tiempo_total_ejecucion:.2f} segundos")
 
 print("\n==================================================")
 print(f"Precisión de Entrenamiento (Train Accuracy): {train_acc * 100:.2f}%")
