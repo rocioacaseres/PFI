@@ -33,28 +33,23 @@ def hilo_procesamiento_ia():
     """ HILO 2: Procesamiento y clasificacion """
     print("[Hilo 2] Procesamiento de la data con ROCKET")
     
-    # Aquí cargaremos tu modelo exportado con joblib...
+    # Modelo cargado con joblib
     
     while sistema_corriendo.is_set():
         try:
             # Espera hasta que haya un bloque de audio disponible (timeout de 1 seg)
             bloque_audio = cola_procesamiento.get(timeout=1)
             
-            # --- ACÁ IRÁ TU PIPELINE ---
-            # 1. Transformar bloque_audio a MFCC (librosa)
-            # 2. Pasar matriz por ROCKET/Mini-ROCKET
-            # 3. model.predict()
-            # 4. if prediccion == 'siren': encender LED rojo
+            # ---PIPELINE
             # ---------------------------
             
-            # Simulamos el tiempo de procesamiento (ROCKET es rapidísimo, < 50ms)
             time.sleep(0.05) 
             print("[Hilo 2] Audio procesado.")
             
             cola_procesamiento.task_done()
             
         except queue.Empty:
-            continue # Si no hay audio, vuelve a intentar
+            continue 
             
     print("[Hilo 2] Apagando motor IA.")
 
@@ -62,11 +57,9 @@ def hilo_datalogger():
     """ HILO 3: CGuarda el historial en la MicroSD """
     print("[Hilo 3] Datalogger ")
     
-    # Aquí abriremos un archivo .wav en modo escritura (append)...
     
     while sistema_corriendo.is_set():
         try:
-            # Saca un bloque de la cola de grabación
             bloque_audio = cola_grabacion.get(timeout=1)
             
             # Simulamos la escritura lenta en la memoria SD

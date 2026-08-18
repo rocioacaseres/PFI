@@ -1,10 +1,10 @@
 import numpy as np
 import librosa
-import joblib
+from joblib import load
 
 # Carga de modelo y etiquetas
-modelo = joblib.load('modelo_exportado.pkl')
-le = joblib.load('label_encoder.pkl')
+modelo = load('mini_rocket_modelo_exportado.pkl')
+le = load('label_encoder.pkl')
 
 # Extraigo audio
 def procesar_audio_a_mfcc(ruta_audio):
@@ -19,7 +19,7 @@ def procesar_audio_a_mfcc(ruta_audio):
     return mfcc_3d
 
 
-audio_prueba = "prueba_audio_pinamar.wav" # Acá luego conectarás el micrófono I2S
+audio_prueba = "audio_ca.wav"
 datos_listos = procesar_audio_a_mfcc(audio_prueba)
 
 print("Clasificando")
