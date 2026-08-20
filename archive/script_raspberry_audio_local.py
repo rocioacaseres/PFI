@@ -1,6 +1,8 @@
+#Este script toma un audio que esta en el mismo directorio y lo clasifica
 import numpy as np
 import librosa
 from joblib import load
+
 
 # Carga de modelo y etiquetas
 modelo = load('mini_rocket_modelo_exportado.pkl')
