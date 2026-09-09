@@ -1,8 +1,11 @@
 import time
 import numpy as np
 import librosa
+import os
 from joblib import load
 import sounddevice as sd
+import soundfile as sf
+
 
 
 # ==========================================
@@ -12,16 +15,25 @@ import sounddevice as sd
 SR = 22050
 DURACION = 5
 
+#Directorio donde dejo los audios grabados
+
+DIRECTORIO_AUDIOS = "/home/rcaseres/audios_grabados"
+
+os.makedirs(
+    DIRECTORIO_AUDIOS,
+    exist_ok=True
+)
+
 
 # ==========================================
 # CARGA DE MODELO
 # ==========================================
 
-print("Cargando modelo...")
+print("Carga de modelo")
 
 t0 = time.perf_counter()
 
-modelo = load('mini_rocket_modelo_exportado.pkl')
+modelo = load('modelo_exportado.pkl')
 le = load('label_encoder.pkl')
 
 t1 = time.perf_counter()
@@ -33,8 +45,9 @@ print(f"Modelo cargado en: {t1 - t0:.4f} s")
 # FUNCIÓN MFCC
 # ==========================================
 
-def procesar_audio_a_mfcc(y, sr):
+def procesar_audio_a_mfcc(y, sr): 
 
+    #Extraigo MFCC
     mfcc = librosa.feature.mfcc(
         y=y,
         sr=sr,
@@ -48,10 +61,10 @@ def procesar_audio_a_mfcc(y, sr):
 
 
 # ==========================================
-# WARM-UP
+# PRE-CARGO MODELO
 # ==========================================
 
-print("\nRealizando warm-up...")
+print("\nPrecargo modelo")
 
 # Genero 5 segundos de silencio
 audio_dummy = np.zeros(
@@ -67,27 +80,28 @@ datos_dummy = procesar_audio_a_mfcc(
 
 t0 = time.perf_counter()
 
-_ = modelo.predict(datos_dummy)
+modelo.predict(datos_dummy)
 
 t1 = time.perf_counter()
 
-print(f"Warm-up terminado en: {t1 - t0:.4f} s")
+print(f"Precarga de modelo terminado en: {t1 - t0:.4f} s")
 
 
 # ==========================================
 # LOOP PRINCIPAL
 # ==========================================
-
+contador_audio = 1
 while True:
 
-    input("\nPresioná ENTER para grabar...")
+    opcion = input(
+    "\nPresioná ENTER para grabar o escribí q para terminar: "
+    )
+    if opcion.lower() == "q":
+        break
 
-    # --------------------------------------
-    # GRABACIÓN
-    # --------------------------------------
-
-    print("Grabando...")
-
+    print("Grabando en 3s")
+    time.sleep(3)
+    print("Grabando")
     t_inicio_grabacion = time.perf_counter()
 
     audio_grabado = sd.rec(
@@ -96,15 +110,37 @@ while True:
         channels=1,
         dtype='float32'
     )
-
+    #5 segundos × 22050 muestras/segundos = 110250 muestras
     sd.wait()
 
     t_fin_grabacion = time.perf_counter()
 
     print("Grabación finalizada")
 
-    audio_grabado = audio_grabado.flatten()
+    audio_grabado = audio_grabado.flatten() #recibo 2 dimensiones, con flatten queda de 1 dimension
 
+    # GUARDADO DE AUDIO
+    # --------------------------------------
+
+    nombre_audio = f"audio_{contador_audio:04d}.wav"
+
+    ruta_audio = os.path.join(
+        DIRECTORIO_AUDIOS,
+        nombre_audio
+    )
+
+    sf.write(
+        ruta_audio,
+        audio_grabado,
+        SR
+    )
+
+    print(
+        f"Audio guardado en: "
+        f"{ruta_audio}"
+    )
+
+    contador_audio += 1
 
     # --------------------------------------
     # MFCC
@@ -176,7 +212,7 @@ while True:
 
 
     print(
-        f"\n🔊 Sonido detectado: "
+        f"\nSonido detectado: "
         f"{clase_texto[0]}"
     )
 

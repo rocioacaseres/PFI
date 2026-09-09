@@ -13,7 +13,7 @@ import sounddevice as sd
 
 t_inicio_carga = time.perf_counter()
 
-modelo = load('mini_rocket_modelo_exportado.pkl')
+modelo = load('modelo_exportado.pkl')
 le = load('label_encoder.pkl')
 
 t_fin_carga = time.perf_counter()
@@ -128,7 +128,7 @@ t_fin_total = time.perf_counter()
 # RESULTADO
 # ==========================================
 
-print(f"\n🔊 Sonido detectado: {clase_texto[0]}")
+print(f"\n Sonido detectado: {clase_texto[0]}")
 
 
 # ==========================================
