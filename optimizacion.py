@@ -1,12 +1,23 @@
-import time
-import numpy as np
-import librosa
+
 import os
+NUMBA_CACHE_DIR = "/tmp/numba_cache"
+
+os.environ["NUMBA_CACHE_DIR"] = NUMBA_CACHE_DIR
+
+os.makedirs(
+    NUMBA_CACHE_DIR,
+    exist_ok=True
+)
+
+print(f"NUMBA_CACHE_DIR: {NUMBA_CACHE_DIR}")
+
 from joblib import load
 import sounddevice as sd
 import soundfile as sf
-
-
+import subprocess
+import time
+import numpy as np
+import librosa
 
 # ==========================================
 # CONFIGURACIÓN
@@ -42,7 +53,7 @@ print(f"Modelo cargado en: {t1 - t0:.4f} s")
 
 
 # ==========================================
-# FUNCIÓN MFCC
+# FUNCION MFCC
 # ==========================================
 
 def procesar_audio_a_mfcc(y, sr): 
@@ -157,7 +168,7 @@ while True:
 
 
     # --------------------------------------
-    # PREDICCIÓN
+    # PREDICCION
     # --------------------------------------
 
     print("Clasificando...")
