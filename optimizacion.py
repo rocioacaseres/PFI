@@ -18,6 +18,7 @@ import subprocess
 import time
 import numpy as np
 import librosa
+import types
 
 # ==========================================
 # CONFIGURACIÓN
@@ -35,6 +36,151 @@ os.makedirs(
     exist_ok=True
 )
 
+# ==========================================
+# ADAPTACION ROCKET
+# ==========================================
+
+def adaptar_detach_rocket(modelo):
+    """
+    Adapta automáticamente modelos DetachRocket antiguos o actuales.
+    No copia el transformer ni aumenta significativamente la RAM.
+    """
+
+    atributos_antiguos = (
+        "_is_fitted",
+        "_full_transformer",
+        "_scaler",
+        "_feature_mask",
+        "_classifier",
+    )
+
+    atributos_actuales = (
+        "is_fitted_",
+        "classifier_",
+        "pruned_transformer_",
+        "pruned_scaler_",
+    )
+
+    # ==========================================
+    # MODELO CON API ANTIGUA
+    # ==========================================
+
+    if all(
+        hasattr(modelo, atributo)
+        for atributo in atributos_antiguos
+    ):
+        if not modelo._is_fitted:
+            raise RuntimeError(
+                "El modelo DetachRocket antiguo no está entrenado."
+            )
+
+        def preparar_X_legacy(self, X):
+            # Aplicación del transformer ROCKET original
+            transformed_X = self._full_transformer.transform(X)
+
+            if hasattr(transformed_X, "to_numpy"):
+                transformed_X = transformed_X.to_numpy()
+            else:
+                transformed_X = np.asarray(transformed_X)
+
+            if transformed_X.ndim != 2:
+                raise ValueError(
+                    "El transformer produjo una matriz con forma "
+                    f"{transformed_X.shape}; se esperaba una matriz 2D."
+                )
+
+            # Verificación del número de características
+            feature_mask = np.asarray(
+                self._feature_mask,
+                dtype=bool
+            )
+
+            if transformed_X.shape[1] != feature_mask.size:
+                raise ValueError(
+                    "El número de características generado por ROCKET "
+                    "no coincide con la máscara guardada. "
+                    f"ROCKET generó {transformed_X.shape[1]} y la máscara "
+                    f"contiene {feature_mask.size}."
+                )
+
+            # Escalado exactamente igual al entrenamiento original
+            transformed_X = self._scaler.transform(transformed_X)
+
+            # Conservación de las características seleccionadas
+            transformed_X = transformed_X[:, feature_mask]
+
+            # Verificación del clasificador
+            cantidad_esperada = getattr(
+                self._classifier,
+                "n_features_in_",
+                transformed_X.shape[1]
+            )
+
+            if transformed_X.shape[1] != cantidad_esperada:
+                raise ValueError(
+                    "El clasificador espera "
+                    f"{cantidad_esperada} características, pero después "
+                    f"de aplicar la máscara quedaron "
+                    f"{transformed_X.shape[1]}."
+                )
+
+            return transformed_X
+
+        def predict_legacy(self, X):
+            X_preparado = preparar_X_legacy(self, X)
+            return self._classifier.predict(X_preparado)
+
+        # Reemplaza predict solamente para este objeto cargado
+        modelo.predict = types.MethodType(
+            predict_legacy,
+            modelo
+        )
+
+        print(
+            "Compatibilidad completa aplicada: "
+            "DetachRocket API antigua"
+        )
+
+        return modelo
+
+    # ==========================================
+    # MODELO CON API ACTUAL
+    # ==========================================
+
+    if all(
+        hasattr(modelo, atributo)
+        for atributo in atributos_actuales
+    ):
+        if not modelo.is_fitted_:
+            raise RuntimeError(
+                "El modelo DetachRocket actual no está entrenado."
+            )
+
+        print("Modelo DetachRocket con API actual")
+
+        return modelo
+
+    # ==========================================
+    # ESTRUCTURA DESCONOCIDA O INCOMPLETA
+    # ==========================================
+
+    atributos_presentes = sorted(
+        atributo
+        for atributo in vars(modelo)
+        if (
+            "classifier" in atributo
+            or "transformer" in atributo
+            or "scaler" in atributo
+            or "mask" in atributo
+            or "fitted" in atributo
+        )
+    )
+
+    raise RuntimeError(
+        "La estructura del modelo DetachRocket no coincide con "
+        "la API antigua ni con la actual.\n"
+        f"Atributos relevantes encontrados: {atributos_presentes}"
+    )
 
 # ==========================================
 # CARGA DE MODELO
@@ -44,8 +190,10 @@ print("Carga de modelo")
 
 t0 = time.perf_counter()
 
-modelo = load('modelo_exportado.pkl')
+modelo = load('modelo_detach_rocket.pkl')
 le = load('label_encoder.pkl')
+
+modelo = adaptar_detach_rocket(modelo)
 
 t1 = time.perf_counter()
 
