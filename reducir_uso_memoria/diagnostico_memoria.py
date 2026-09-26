@@ -195,10 +195,57 @@ le = load('label_encoder.pkl')
 
 modelo = adaptar_detach_rocket(modelo)
 
-t1 = time.perf_counter()
+tiempo_carga = time.perf_counter() - t0
 
-print(f"Modelo cargado en: {t1 - t0:.4f} s")
+print(f"Modelo y encoder cargados en: {tiempo_carga:.4f} s")
 
+# ==========================================
+# INFORMACIÓN DEL MODELO DETACHROCKET
+# ==========================================
+
+mascara = np.asarray(
+    modelo._feature_mask,
+    dtype=bool
+)
+
+caracteristicas_totales = mascara.size
+caracteristicas_seleccionadas = np.count_nonzero(mascara)
+
+porcentaje_conservado = (
+    100
+    * caracteristicas_seleccionadas
+    / caracteristicas_totales
+)
+
+print("\n===== ESTRUCTURA DETACHROCKET =====")
+print(
+    f"Transformer: "
+    f"{type(modelo._full_transformer).__name__}"
+)
+print(
+    f"Clasificador: "
+    f"{type(modelo._classifier).__name__}"
+)
+print(
+    f"Características originales: "
+    f"{caracteristicas_totales}"
+)
+print(
+    f"Características seleccionadas: "
+    f"{caracteristicas_seleccionadas}"
+)
+print(
+    f"Porcentaje conservado: "
+    f"{porcentaje_conservado:.2f}%"
+)
+
+if hasattr(modelo._classifier, "coef_"):
+    print(
+        f"Forma de coeficientes: "
+        f"{modelo._classifier.coef_.shape}"
+    )
+
+print("==================================")
 
 # ==========================================
 # FUNCION MFCC
@@ -241,167 +288,131 @@ t0 = time.perf_counter()
 
 modelo.predict(datos_dummy)
 
-tiempo_carga = time.perf_counter() - t0
+tiempo_precarga = time.perf_counter() - t0
 
-print(f"Modelo y encoder cargados en: {tiempo_carga:.4f} s")
+print(
+    f"Precarga de modelo terminada en: "
+    f"{tiempo_precarga:.4f} s"
+)
 
+del audio_dummy
+del datos_dummy
 
 # ==========================================
-# LOOP PRINCIPAL
+# MEDICIÓN CONTROLADA: UNA SOLA EJECUCIÓN
 # ==========================================
-contador_audio = 1
-while True:
 
-    opcion = input(
-    "\nPresioná ENTER para grabar o escribí q para terminar: "
-    )
-    if opcion.lower() == "q":
-        break
+print("\nGrabando en 3 segundos...")
+time.sleep(3)
 
-    print("Grabando en 3s")
-    time.sleep(3)
-    print("Grabando")
-    t_inicio_grabacion = time.perf_counter()
+# ------------------------------------------
+# GRABACIÓN
+# ------------------------------------------
 
-    audio_grabado = sd.rec(
-        int(DURACION * SR),
-        samplerate=SR,
-        channels=1,
-        dtype='float32'
-    )
-    #5 segundos × 22050 muestras/segundos = 110250 muestras
-    sd.wait()
+print("Grabando...")
 
-    t_fin_grabacion = time.perf_counter()
+t_inicio_grabacion = time.perf_counter()
 
-    print("Grabación finalizada")
+audio_grabado = sd.rec(
+    int(DURACION * SR),
+    samplerate=SR,
+    channels=1,
+    dtype="float32"
+)
 
-    audio_grabado = audio_grabado.flatten() #recibo 2 dimensiones, con flatten queda de 1 dimension
+sd.wait()
 
-    # GUARDADO DE AUDIO
-    # --------------------------------------
+tiempo_grabacion = (
+    time.perf_counter()
+    - t_inicio_grabacion
+)
 
-    nombre_audio = f"audio_{contador_audio:04d}.wav"
+print("Grabación finalizada")
 
-    ruta_audio = os.path.join(
-        DIRECTORIO_AUDIOS,
-        nombre_audio
-    )
+# Como es mono, evita la copia adicional de flatten()
+audio_grabado = audio_grabado[:, 0]
 
-    sf.write(
-        ruta_audio,
-        audio_grabado,
-        SR
-    )
+# ------------------------------------------
+# GUARDADO
+# ------------------------------------------
 
-    print(
-        f"Audio guardado en: "
-        f"{ruta_audio}"
-    )
+ruta_audio = os.path.join(
+    DIRECTORIO_AUDIOS,
+    "medicion_etapa_0.wav"
+)
 
-    contador_audio += 1
+t_inicio_guardado = time.perf_counter()
 
-    # --------------------------------------
-    # MFCC
-    # --------------------------------------
+sf.write(
+    ruta_audio,
+    audio_grabado,
+    SR
+)
 
-    t_inicio_mfcc = time.perf_counter()
+tiempo_guardado = (
+    time.perf_counter()
+    - t_inicio_guardado
+)
 
-    datos_listos = procesar_audio_a_mfcc(
-        audio_grabado,
-        SR
-    )
+# ------------------------------------------
+# MFCC
+# ------------------------------------------
 
-    t_fin_mfcc = time.perf_counter()
+t_inicio_mfcc = time.perf_counter()
 
+datos_listos = procesar_audio_a_mfcc(
+    audio_grabado,
+    SR
+)
 
-    # --------------------------------------
-    # PREDICCION
-    # --------------------------------------
+tiempo_mfcc = (
+    time.perf_counter()
+    - t_inicio_mfcc
+)
 
-    print("Clasificando...")
+# ------------------------------------------
+# PREDICCIÓN
+# ------------------------------------------
 
-    t_inicio_prediccion = time.perf_counter()
+t_inicio_prediccion = time.perf_counter()
 
-    prediccion = modelo.predict(datos_listos)
+prediccion = modelo.predict(datos_listos)
 
-    t_fin_prediccion = time.perf_counter()
+tiempo_prediccion = (
+    time.perf_counter()
+    - t_inicio_prediccion
+)
 
+# ------------------------------------------
+# ETIQUETA
+# ------------------------------------------
 
-    # --------------------------------------
-    # ETIQUETA
-    # --------------------------------------
+t_inicio_etiqueta = time.perf_counter()
 
-    t_inicio_etiqueta = time.perf_counter()
+clase_texto = le.inverse_transform(prediccion)
 
-    clase_texto = le.inverse_transform(prediccion)
+tiempo_etiqueta = (
+    time.perf_counter()
+    - t_inicio_etiqueta
+)
 
-    t_fin_etiqueta = time.perf_counter()
+tiempo_procesamiento = (
+    tiempo_mfcc
+    + tiempo_prediccion
+    + tiempo_etiqueta
+)
 
+print(f"\nSonido detectado: {clase_texto[0]}")
 
-    # ======================================
-    # RESULTADOS
-    # ======================================
+print("\n========== TIEMPOS ==========")
+print(f"Carga del modelo:      {tiempo_carga:.4f} s")
+print(f"Precarga:              {tiempo_precarga:.4f} s")
+print(f"Grabación:             {tiempo_grabacion:.4f} s")
+print(f"Guardado WAV:          {tiempo_guardado:.4f} s")
+print(f"Extracción MFCC:       {tiempo_mfcc:.4f} s")
+print(f"Predicción Detach:     {tiempo_prediccion:.4f} s")
+print(f"Inverse transform:     {tiempo_etiqueta:.4f} s")
+print("--------------------------------")
+print(f"Procesamiento total:   {tiempo_procesamiento:.4f} s")
+print("=============================")
 
-    tiempo_grabacion = (
-        t_fin_grabacion
-        - t_inicio_grabacion
-    )
-
-    tiempo_mfcc = (
-        t_fin_mfcc
-        - t_inicio_mfcc
-    )
-
-    tiempo_prediccion = (
-        t_fin_prediccion
-        - t_inicio_prediccion
-    )
-
-    tiempo_etiqueta = (
-        t_fin_etiqueta
-        - t_inicio_etiqueta
-    )
-
-    tiempo_procesamiento = (
-        tiempo_mfcc
-        + tiempo_prediccion
-        + tiempo_etiqueta
-    )
-
-
-    print(
-        f"\nSonido detectado: "
-        f"{clase_texto[0]}"
-    )
-
-    print("\n========== TIEMPOS ==========")
-
-    print(
-        f"Grabación:             "
-        f"{tiempo_grabacion:.4f} s"
-    )
-
-    print(
-        f"Extracción MFCC:       "
-        f"{tiempo_mfcc:.4f} s"
-    )
-
-    print(
-        f"Predicción DetachRocket: "
-        f"{tiempo_prediccion:.4f} s"
-    )
-
-    print(
-        f"Inverse transform:     "
-        f"{tiempo_etiqueta:.4f} s"
-    )
-
-    print("--------------------------------")
-
-    print(
-        f"Procesamiento total:   "
-        f"{tiempo_procesamiento:.4f} s"
-    )
-
-    print("=============================")
